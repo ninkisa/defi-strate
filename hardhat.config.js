@@ -1,9 +1,9 @@
 /** @type import('hardhat/config').HardhatUserConfig */
+require("@uniswap/hardhat-v3-deploy");
 require("@nomiclabs/hardhat-waffle")
 require('dotenv').config();
 require("@nomiclabs/hardhat-ethers");
 require("hardhat-deploy")
-require("@uniswap/hardhat-v3-deploy");
 
 
 const { API_URL, PRIVATE_KEY } = process.env;
@@ -14,6 +14,9 @@ module.exports = {
     compilers: [
       {
         version: "0.8.8",
+      },
+      {
+        version: "0.8.10",
       },
       {
         version: "0.6.12",
@@ -35,11 +38,14 @@ module.exports = {
         url: "https://eth-goerli.g.alchemy.com/v2/mwCSzJiWlR2gaqbRCvdOIKkcG4PcI1YG",
         // blockNumber: 7413967
       },
+      // blockConfirmations: 6,
+
     },
     goerli: {
       url: API_URL,
       accounts: [`0x${PRIVATE_KEY}`],
       chainId: 5,
+      blockConfirmations: 6,
     },
     localhost: {
       url: "http://localhost:8545",

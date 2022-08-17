@@ -1,7 +1,8 @@
 const { assert, expect } = require("chai")
 const { ethers } = require('hardhat')
 
-const { developmentChains, INITIAL_SUPPLY } = require("../helper-hardhat-config")
+const { developmentChains, networkConfig, INITIAL_SUPPLY } = require("../helper-hardhat-config")
+
 const UniswapV3Deployer = require('@uniswap/hardhat-v3-deploy/dist/deployer/UniswapV3Deployer.js').UniswapV3Deployer
 
 
@@ -37,51 +38,53 @@ const UniswapV3Deployer = require('@uniswap/hardhat-v3-deploy/dist/deployer/Unis
             userAccount = accounts[2]
             adminAccount = accounts[3]
 
+            // deploy test erc20 token
             let TestToken = await ethers.getContractFactory("TestToken");
-            usdcToken = await TestToken.deploy(INITIAL_SUPPLY);
+            usdcToken = await TestToken.deploy(INITIAL_DEPLOYER_AMOUNT);
             await usdcToken.deployed()
+
             let blockNumber = await ethers.provider.getBlockNumber();
             let block = await ethers.provider.getBlock(blockNumber);
 
-
             ; ({ weth9, factory: uniswapFactory, router, positionManager } = await UniswapV3Deployer.deploy(deployer))
-            console.log("------------->1 ");
+
+
+            await weth9.connect(deployer).deposit({ value: INITIAL_DEPLOYER_AMOUNT })
+            expect(await weth9.balanceOf(deployer.address)).to.deep.equal(INITIAL_DEPLOYER_AMOUNT);
+            expect(await usdcToken.balanceOf(deployer.address)).to.deep.equal(INITIAL_DEPLOYER_AMOUNT);
 
             await (await positionManager.createAndInitializePoolIfNecessary(weth9.address, usdcToken.address, POOL_FEE, POOL_PRICE)).wait();
-            console.log("------------->2 ");
-            await (await weth9.connect(deployer).approve(positionManager.address, INITIAL_DEPLOYER_AMOUNT)).wait();
-            console.log("------------->3 ");
-            await (await usdcToken.connect(deployer).approve(positionManager.address, INITIAL_DEPLOYER_AMOUNT)).wait();
-            console.log("------------->4 ");
-            await (await positionManager.connect(deployer).mint({
-                    /* address token0         */token0: weth9.address,
-                    /* address token1         */token1: usdcToken.address,
-                    /* uint24 fee             */fee: POOL_FEE,
-                    /* int24 tickLower        */tickLower: TickMath.MIN_TICK,
-                    /* int24 tickUpper        */tickUpper: TickMath.MAX_TICK,
-                    /* uint256 amount0Desired */amount0Desired: INITIAL_DEPLOYER_AMOUNT,
-                    /* uint256 amount1Desired */amount1Desired: INITIAL_DEPLOYER_AMOUNT,
-                    /* uint256 amount0Min     */amount0Min: "0",
-                    /* uint256 amount1Min     */amount1Min: "0",
-                    /* address recipient      */recipient: deployer.address,
-                    /* uint256 deadline       */deadline: block.timestamp + TIMESTAMP_STEP
-            })).wait();
-            console.log("------------->5 ");
+            // await (await weth9.connect(deployer).approve(positionManager.address, INITIAL_DEPLOYER_AMOUNT)).wait();
+            // await (await usdcToken.connect(deployer).approve(positionManager.address, INITIAL_DEPLOYER_AMOUNT)).wait();
+            // await (await positionManager.connect(deployer).mint({
+            //         /* address token0         */token0: weth9.address,
+            //         /* address token1         */token1: usdcToken.address,
+            //         /* uint24 fee             */fee: POOL_FEE,
+            //         /* int24 tickLower        */tickLower: LOWERTICK,
+            //         /* int24 tickUpper        */tickUpper: UPPERTICK,
+            //         /* uint256 amount0Desired */amount0Desired: INITIAL_DEPLOYER_AMOUNT,
+            //         /* uint256 amount1Desired */amount1Desired: INITIAL_DEPLOYER_AMOUNT,
+            //         /* uint256 amount0Min     */amount0Min: "0",
+            //         /* uint256 amount1Min     */amount1Min: "0",
+            //         /* address recipient      */recipient: deployer.address,
+            //         /* uint256 deadline       */deadline: block.timestamp + TIMESTAMP_STEP
+            // })).wait();
         })
 
         beforeEach(async function () {
-            // Deploy Uniswap V3 contracts
-
             const LibUniswap = await ethers.getContractFactory("LibUniswap");
             const uibUniswap = await LibUniswap.deploy();
             await uibUniswap.deployed();
 
-            let Strategy = await ethers.getContractFactory("Strategy", {
-                libraries: {
-                    LibUniswap: uibUniswap.address,
-                },
-            });
-            defiStrategy = await Strategy.deploy(router.address, weth9.address, usdcToken.address);
+            let Strategy = await ethers.getContractFactory("Strategy");
+            // let Strategy = await ethers.getContractFactory("Strategy", {
+            //     libraries: {
+            //         LibUniswap: uibUniswap.address,
+            //     },
+            // });
+            const aaveLPAddrProviderAddress = networkConfig[network.config.chainId].aaveLPAddrProvider
+
+            defiStrategy = await Strategy.deploy(router.address, aaveLPAddrProviderAddress, weth9.address, usdcToken.address);
             await defiStrategy.deployed()
 
         })
@@ -102,17 +105,17 @@ const UniswapV3Deployer = require('@uniswap/hardhat-v3-deploy/dist/deployer/Unis
             })
             it("Updates the amount deposited data structure", async () => {
                 await defiStrategy.deposit({ value: sendValue })
+                let user = (await getNamedAccounts()).deployer
                 const response = await defiStrategy.getAddressToAmountFunded(
-                    deployer
+                    user
                 )
-                console.log("Weth balance %s ", weth9.address.balance);
-
                 assert.equal(response.toString(), sendValue.toString())
             })
             it("Adds funder to array of funders", async () => {
+                let user = (await getNamedAccounts()).deployer
                 await defiStrategy.deposit({ value: sendValue })
                 const response = await defiStrategy.getUser(0)
-                assert.equal(response, deployer)
+                assert.equal(response, user)
             })
         })
     });

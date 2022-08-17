@@ -7,8 +7,13 @@ error NotOwner();
 
 import "./interfaces/IWETH.sol";
 import "./libraries/LibUniswap.sol";
+
 import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+import {IPoolAddressesProvider} from "@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol";
+import {IPool} from "@aave/core-v3/contracts/interfaces/IPool.sol";
+
 import "hardhat/console.sol";
 
 contract Strategy {
@@ -24,12 +29,14 @@ contract Strategy {
     ISwapRouter public immutable swapRouter;
     IWETH private immutable i_weth;
     IERC20 private immutable i_usdc;
+    IPoolAddressesProvider private immutable i_lpAddrProvider;
 
     // For this example, we will set the pool fee to 0.3%.
     uint24 public constant poolFee = 3000;
 
     constructor(
         address _swapRouter,
+        address _aaveLPAddrProvider,
         address _wethAddr,
         address _usdcAddr
     ) {
@@ -37,6 +44,7 @@ contract Strategy {
         swapRouter = ISwapRouter(_swapRouter);
         i_weth = IWETH(_wethAddr);
         i_usdc = IERC20(_usdcAddr);
+        i_lpAddrProvider = IPoolAddressesProvider(_aaveLPAddrProvider);
     }
 
     function deposit() public payable {
@@ -49,11 +57,9 @@ contract Strategy {
         require(msg.value >= MINIMUM_ETH, "You need to spend more ETH!");
 
         addressToAmountDeposited[msg.sender] += msg.value;
-
-        convertInternal(msg.value);
-        LibUniswap.print_hello();
-
         users.push(msg.sender);
+        uint256 amountOut = convertInternal(msg.value);
+        console.log("amountOut in usdc %s ", amountOut);
     }
 
     function withdraw(uint256 _amount) public {
@@ -71,51 +77,18 @@ contract Strategy {
      *
      * @param inputAmount The input amount
      */
-    function convertInternal(uint inputAmount) internal {
-        console.log("Before deposit -------------------");
-        uint256 thisBalance = address(this).balance;
-        uint256 wethBalance = address(i_weth).balance;
-        uint256 senderBalance = msg.sender.balance;
-
+    function convertInternal(uint inputAmount) internal returns (uint256) {
         // the input is ETH, should convert to WETH
         i_weth.deposit{value: inputAmount}();
 
-        console.log("After deposit -------------------");
-        thisBalance = address(this).balance;
-        console.log("Got thisBalance %s ETH", thisBalance);
-
-        wethBalance = address(i_weth).balance;
-        console.log("Got wethBalance %s WETH", wethBalance);
-        i_weth.transfer(address(this), wethBalance);
-
-        senderBalance = msg.sender.balance;
-        console.log("Got sender %s WETH", senderBalance);
-
-        // IERC20 inputERC20 = IERC20(address(i_weth));
-        // require(
-        //     inputERC20.approve(address(swapRouter), wethBalance),
-        //     "weth should approve"
-        // );
-
-        uint256 amountOut = this.swapExactInputSingle(wethBalance);
-
-        console.log("amountOut in usdc %s ", amountOut);
+        uint256 amountOut = this.swapExactInputSingle(inputAmount);
+        return amountOut;
     }
 
     function swapExactInputSingle(uint256 amountIn)
         external
         returns (uint256 amountOut)
     {
-        // // Transfer the specified amount of DAI to this contract.
-        // TransferHelper.safeTransferFrom(
-        //     address(i_weth), // token address
-        //     msg.sender, // spender msg.sender
-        //     address(this), // receiver
-        //     amountIn
-        // );
-
-        console.log("before approve");
-
         // Approve the router to spend DAI.
         TransferHelper.safeApprove(
             address(i_weth), // token address
@@ -125,8 +98,6 @@ contract Strategy {
 
         console.log("after approve");
 
-        // Naively set amountOutMinimum to 0. In production, use an oracle or other data source to choose a safer value for amountOutMinimum.
-        // We also set the sqrtPriceLimitx96 to be 0 to ensure we swap our exact input amount.
         ISwapRouter.ExactInputSingleParams memory params = ISwapRouter
             .ExactInputSingleParams({
                 tokenIn: address(i_weth),
@@ -140,17 +111,28 @@ contract Strategy {
             });
 
         console.log("before swap");
-        // The call to `exactInputSingle` executes the swap.
         amountOut = swapRouter.exactInputSingle(params);
+        // this.depositToAave(amountOut);
     }
+
+    // function depositToAave(uint256 amount) external {
+    //     address lendingPoolAddress = i_lpAddrProvider.getPool();
+    //     IPool lendingPoolInstance = IPool(lendingPoolAddress);
+    //     uint16 referral = 0;
+
+    //     i_usdc.approve(address(lendingPoolInstance), amount);
+    //     i_usdc.approve(address(this), amount);
+    //     i_usdc.allowance(address(this), address(this));
+    //     lendingPoolInstance.supply(
+    //         address(i_usdc), // token
+    //         amount, // amount
+    //         address(this), // user
+    //         referral
+    //     );
+    // }
 
     function getDexAddress() public view returns (ISwapRouter) {
         return swapRouter;
-    }
-
-    function ethBalance() public view returns (uint256 _balance) {
-        _balance = address(this).balance;
-        return _balance;
     }
 
     function getAddressToAmountFunded(address fundingAddress)
@@ -167,6 +149,11 @@ contract Strategy {
 
     function getOwner() public view returns (address) {
         return i_owner;
+    }
+
+    function ethBalance() public view returns (uint256 _balance) {
+        _balance = address(this).balance;
+        return _balance;
     }
 
     fallback() external payable {

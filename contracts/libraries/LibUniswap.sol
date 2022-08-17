@@ -23,24 +23,16 @@ library LibUniswap {
         ISwapRouter swapRouter,
         address inputCurrency,
         address outputCurrency,
-        address sender,
-        address from,
         uint256 amountIn
     ) external returns (uint256 amountOut) {
-        // msg.sender must approve this contract
-
-        IERC20 inputERC20 = IERC20(address(inputCurrency));
-        require(inputERC20.approve(address(this), amountIn), "approve");
-
-        // Transfer the specified amount of DAI to this contract.
-        TransferHelper.safeTransferFrom(inputCurrency, sender, from, amountIn);
-
         // Approve the router to spend DAI.
         TransferHelper.safeApprove(
-            inputCurrency,
-            address(swapRouter),
+            inputCurrency, // token address
+            outputCurrency,
             amountIn
         );
+
+        console.log("after approve");
 
         // Naively set amountOutMinimum to 0. In production, use an oracle or other data source to choose a safer value for amountOutMinimum.
         // We also set the sqrtPriceLimitx96 to be 0 to ensure we swap our exact input amount.
@@ -49,13 +41,14 @@ library LibUniswap {
                 tokenIn: inputCurrency,
                 tokenOut: outputCurrency,
                 fee: poolFee,
-                recipient: sender,
+                recipient: address(this),
                 deadline: block.timestamp,
                 amountIn: amountIn,
                 amountOutMinimum: 0,
                 sqrtPriceLimitX96: 0
             });
 
+        console.log("before swap");
         // The call to `exactInputSingle` executes the swap.
         amountOut = swapRouter.exactInputSingle(params);
     }
