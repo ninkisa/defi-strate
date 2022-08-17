@@ -1,6 +1,6 @@
 // imports
 const { getNamedAccounts, deployments, network } = require("hardhat")
-const { networkConfig, developmentChains } = require("../helper-hardhat-config")
+const { networkConfig, developmentChains, INITIAL_SUPPLY } = require("../helper-hardhat-config")
 const UniswapV3Deployer = require('@uniswap/hardhat-v3-deploy/dist/deployer/UniswapV3Deployer.js').UniswapV3Deployer
 
 
@@ -17,19 +17,31 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
 
     let uniswapSwapRouterAddress
     let wethAddr
-    // if (developmentChains.includes(network.name)) {
-    //     ; ({ weth9, factory: uniswapFactory, router, positionManager } = await UniswapV3Deployer.deploy(adminAccount))
-    //     uniswapSwapRouterAddress = router.address
-    //     wethAddr = weth9
-    // } else {
+    let usdcAddr
+
+    if (developmentChains.includes(network.name)) {
+        const usdc = await deploy("TestToken", {
+            from: deployer,
+            args: [INITIAL_SUPPLY],
+            log: true,
+            // we need to wait if on a live network so we can verify properly
+            waitConfirmations: network.config.blockConfirmations || 1,
+        })
+        usdcAddr = usdc.address
+        log(`testToken deployed at ${usdcAddr}`)
+
+    } else {
+        usdcAddr = networkConfig[chainId]["usdc"]
+    }
     uniswapSwapRouterAddress = networkConfig[chainId]["uniswapSwapRouter"]
     wethAddr = networkConfig[chainId]["weth"]
-    // }
+
+
     log("----------------------------------------------------")
     log("Deploying Strategy and waiting for confirmations...")
     const defiStrategy = await deploy("Strategy", {
         from: deployer,
-        args: [uniswapSwapRouterAddress, wethAddr],
+        args: [uniswapSwapRouterAddress, wethAddr, usdcAddr],
         log: true,
         // we need to wait if on a live network so we can verify properly
         waitConfirmations: network.config.blockConfirmations || 1,

@@ -1,7 +1,7 @@
 const { assert, expect } = require("chai")
 const { ethers } = require('hardhat')
 
-const { developmentChains } = require("../helper-hardhat-config")
+const { developmentChains, INITIAL_SUPPLY } = require("../helper-hardhat-config")
 const UniswapV3Deployer = require('@uniswap/hardhat-v3-deploy/dist/deployer/UniswapV3Deployer.js').UniswapV3Deployer
 
 
@@ -15,6 +15,7 @@ const UniswapV3Deployer = require('@uniswap/hardhat-v3-deploy/dist/deployer/Unis
         let userAccount
         let deployer
         let weth9
+        let usdcToken
 
         before(async () => {
             const accounts = await ethers.getSigners()
@@ -24,14 +25,25 @@ const UniswapV3Deployer = require('@uniswap/hardhat-v3-deploy/dist/deployer/Unis
 
                 ; ({ weth9, factory: uniswapFactory, router, positionManager } = await UniswapV3Deployer.deploy(adminAccount))
 
-            // TestERC20 = await ethers.getContractFactory('TestERC20')
+            let TestToken = await ethers.getContractFactory("TestToken");
+            usdcToken = await TestToken.deploy(INITIAL_SUPPLY);
+            await usdcToken.deployed()
+
         })
 
         beforeEach(async function () {
             // Deploy Uniswap V3 contracts
 
-            let Strategy = await ethers.getContractFactory("Strategy");
-            defiStrategy = await Strategy.deploy(router.address, weth9.address);
+            const LibUniswap = await ethers.getContractFactory("LibUniswap");
+            const uibUniswap = await LibUniswap.deploy();
+            await uibUniswap.deployed();
+
+            let Strategy = await ethers.getContractFactory("Strategy", {
+                libraries: {
+                    LibUniswap: uibUniswap.address,
+                },
+            });
+            defiStrategy = await Strategy.deploy(router.address, weth9.address, usdcToken.address);
             await defiStrategy.deployed()
 
         })

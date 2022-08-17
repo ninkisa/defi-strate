@@ -3,8 +3,7 @@ const networkConfig = {
     name: "localhost",
     uniswapSwapRouter: "0xAd578511086c7b454DAf1f8BFbDCE6ca12dE2497",
     uniswapFactory: "0xAf49e224e71AF966D5367E6c8DED0CF7FcD110d0",
-    weth: '0x9D76393e381FE089950c5bFbDD603f033BfB08c2',
-    usdc: ""
+    weth: "0x9D76393e381FE089950c5bFbDD603f033BfB08c2",
   },
   5: {
     name: "goerli",
@@ -15,9 +14,13 @@ const networkConfig = {
   }
 }
 
+const INITIAL_SUPPLY = "1000000000000000000000000"
+
+
 const developmentChains = ["hardhat", "localhost"]
 
 module.exports = {
   networkConfig,
   developmentChains,
+  INITIAL_SUPPLY
 }

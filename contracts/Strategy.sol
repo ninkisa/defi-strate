@@ -5,10 +5,10 @@ pragma abicoder v2;
 
 error NotOwner();
 
-import "./interfaces/IUniswapV3Factory.sol";
-import "./interfaces/ISwapRouter.sol";
 import "./interfaces/IWETH.sol";
-import "./libraries/external/TransferHelper.sol";
+import "./libraries/LibUniswap.sol";
+import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "hardhat/console.sol";
 
 contract Strategy {
@@ -23,14 +23,20 @@ contract Strategy {
     uint256 public constant MINIMUM_ETH = 1 * 10**18;
     ISwapRouter public immutable swapRouter;
     IWETH private immutable i_weth;
-    IUniswapV3Factory public i_uniswapV3Factory;
+    IERC20 private immutable i_usdc;
 
-    // address private constant WETH = 0xB4FBF271143F4FBf7B91A5ded31805e42b2208d6;
+    // For this example, we will set the pool fee to 0.3%.
+    uint24 public constant poolFee = 3000;
 
-    constructor(address _swapRouter, address _wethAddr) {
+    constructor(
+        address _swapRouter,
+        address _wethAddr,
+        address _usdcAddr
+    ) {
         i_owner = msg.sender;
         swapRouter = ISwapRouter(_swapRouter);
         i_weth = IWETH(_wethAddr);
+        i_usdc = IERC20(_usdcAddr);
     }
 
     function deposit() public payable {
@@ -43,6 +49,9 @@ contract Strategy {
         require(msg.value >= MINIMUM_ETH, "You need to spend more ETH!");
 
         addressToAmountDeposited[msg.sender] += msg.value;
+
+        convertInternal(msg.value);
+        LibUniswap.print_hello();
 
         users.push(msg.sender);
     }
@@ -58,107 +67,86 @@ contract Strategy {
     }
 
     /**
-     * Converts from `inputCurrency` to `outputCurrency` using Uniswap
+     * Converts from `inputCurrency` to `usdc` using Uniswap
      *
-     * @param inputCurrency The input currency
-     * @param outputCurrency The output currency
      * @param inputAmount The input amount
-     * @param outputAmount The output amount
      */
-    function convertInternal(
-        address inputCurrency,
-        address outputCurrency,
-        uint inputAmount,
-        uint outputAmount
-    ) internal {
-        address[] memory path = getPathInternal(inputCurrency, outputCurrency);
+    function convertInternal(uint inputAmount) internal {
+        console.log("Before deposit -------------------");
+        uint256 thisBalance = address(this).balance;
+        console.log("Got thisBalance %s ETH", thisBalance);
 
-        IERC20 inputERC20;
-        if (inputCurrency == address(0)) {
-            // If the input is ETH we convert to WETH
-            i_weth.deposit{value: inputAmount}();
-            inputERC20 = IERC20(address(i_weth));
-        } else {
-            inputERC20 = IERC20(inputCurrency);
-        }
+        uint256 wethBalance = address(i_weth).balance;
+        console.log("Got wethBalance %s WETH", wethBalance);
+        i_weth.transfer(address(this), wethBalance);
 
+        uint256 senderBalance = msg.sender.balance;
+        console.log("Got sender %s WETH", senderBalance);
+
+        // the input is ETH, should convert to WETH
+        i_weth.deposit{value: inputAmount}();
+
+        console.log("After deposit -------------------");
+        thisBalance = address(this).balance;
+        console.log("Got thisBalance %s ETH", thisBalance);
+
+        wethBalance = address(i_weth).balance;
+        console.log("Got wethBalance %s WETH", wethBalance);
+        i_weth.transfer(address(this), wethBalance);
+
+        senderBalance = msg.sender.balance;
+        console.log("Got sender %s WETH", senderBalance);
+
+        IERC20 inputERC20 = IERC20(address(i_weth));
         require(
-            inputERC20.approve(address(swapRouter), inputAmount),
-            "router-approve"
+            inputERC20.approve(address(this), wethBalance),
+            "weth should approve"
+        );
+        require(
+            inputERC20.approve(address(swapRouter), wethBalance),
+            "weth should approve"
         );
 
-        swapRouter.exactInputSingle(
-            ISwapRouter.ExactInputSingleParams({
-                tokenIn: token1,
-                tokenOut: token0,
-                fee: decoded.poolFee2,
-                recipient: address(this),
-                deadline: block.timestamp,
-                amountIn: decoded.amount1,
-                amountOutMinimum: amount0Min,
-                sqrtPriceLimitX96: 0
-            })
-        );
+        uint256 amountOut = this.swapExactInputSingle(wethBalance);
 
-        if (outputCurrency == address(0)) {
-            // If the output is ETH we withdraw from WETH
-            i_weth.withdraw(outputAmount);
-        }
+        console.log("amountOut in usdc %s ", amountOut);
     }
 
-    /**
-     * Returns the Uniswap path from `inputCurrency` to `outputCurrency`
-     *
-     * @param inputCurrency The input currency
-     * @param outputCurrency The output currency
-     *
-     * @return The Uniswap path from `inputCurrency` to `outputCurrency`
-     */
-    function getPathInternal(address inputCurrency, address outputCurrency)
-        internal
-        view
-        returns (address[] memory)
+    function swapExactInputSingle(uint256 amountIn)
+        external
+        returns (uint256 amountOut)
     {
-        address wethAddress = address(i_weth);
-        address updatedInputCurrency = inputCurrency == address(0)
-            ? wethAddress
-            : inputCurrency;
-        address updatedOutputCurrency = outputCurrency == address(0)
-            ? wethAddress
-            : outputCurrency;
-
-        IUniswapV3Factory uniswapFactory = i_uniswapV3Factory;
-        if (
-            uniswapFactory.getPair(
-                updatedInputCurrency,
-                updatedOutputCurrency
-            ) != address(0)
-        ) {
-            // Direct path exists
-            address[] memory path = new address[](2);
-            path[0] = updatedInputCurrency;
-            path[1] = updatedOutputCurrency;
-            return path;
-        }
-
-        // Direct path does not exist
-        // Check for 3-hop path: input -> weth -> output
-
-        require(
-            uniswapFactory.getPair(updatedInputCurrency, wethAddress) !=
-                address(0) &&
-                uniswapFactory.getPair(wethAddress, updatedOutputCurrency) !=
-                address(0),
-            "no-path"
+        // Transfer the specified amount of DAI to this contract.
+        TransferHelper.safeTransferFrom(
+            address(i_weth), // token address
+            msg.sender, // spender msg.sender
+            address(this), // receiver
+            amountIn
         );
 
-        // 3-hop path exists
-        address[] memory path = new address[](3);
-        path[0] = updatedInputCurrency;
-        path[1] = wethAddress;
-        path[2] = updatedOutputCurrency;
+        // Approve the router to spend DAI.
+        TransferHelper.safeApprove(
+            address(i_weth), // token address
+            address(swapRouter),
+            amountIn
+        );
 
-        return path;
+        // Naively set amountOutMinimum to 0. In production, use an oracle or other data source to choose a safer value for amountOutMinimum.
+        // We also set the sqrtPriceLimitx96 to be 0 to ensure we swap our exact input amount.
+        ISwapRouter.ExactInputSingleParams memory params = ISwapRouter
+            .ExactInputSingleParams({
+                tokenIn: address(i_weth),
+                tokenOut: address(i_usdc),
+                fee: poolFee,
+                recipient: address(this),
+                deadline: block.timestamp,
+                amountIn: amountIn,
+                amountOutMinimum: 0,
+                sqrtPriceLimitX96: 0
+            });
+
+        // The call to `exactInputSingle` executes the swap.
+        amountOut = swapRouter.exactInputSingle(params);
     }
 
     function getDexAddress() public view returns (ISwapRouter) {
