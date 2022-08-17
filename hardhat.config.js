@@ -34,7 +34,7 @@ module.exports = {
         // blockNumber: 14390000
         url: "https://eth-goerli.g.alchemy.com/v2/mwCSzJiWlR2gaqbRCvdOIKkcG4PcI1YG",
         // blockNumber: 7413967
-      }
+      },
     },
     goerli: {
       url: API_URL,

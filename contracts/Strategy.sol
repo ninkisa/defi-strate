@@ -74,14 +74,8 @@ contract Strategy {
     function convertInternal(uint inputAmount) internal {
         console.log("Before deposit -------------------");
         uint256 thisBalance = address(this).balance;
-        console.log("Got thisBalance %s ETH", thisBalance);
-
         uint256 wethBalance = address(i_weth).balance;
-        console.log("Got wethBalance %s WETH", wethBalance);
-        i_weth.transfer(address(this), wethBalance);
-
         uint256 senderBalance = msg.sender.balance;
-        console.log("Got sender %s WETH", senderBalance);
 
         // the input is ETH, should convert to WETH
         i_weth.deposit{value: inputAmount}();
@@ -97,15 +91,11 @@ contract Strategy {
         senderBalance = msg.sender.balance;
         console.log("Got sender %s WETH", senderBalance);
 
-        IERC20 inputERC20 = IERC20(address(i_weth));
-        require(
-            inputERC20.approve(address(this), wethBalance),
-            "weth should approve"
-        );
-        require(
-            inputERC20.approve(address(swapRouter), wethBalance),
-            "weth should approve"
-        );
+        // IERC20 inputERC20 = IERC20(address(i_weth));
+        // require(
+        //     inputERC20.approve(address(swapRouter), wethBalance),
+        //     "weth should approve"
+        // );
 
         uint256 amountOut = this.swapExactInputSingle(wethBalance);
 
@@ -116,13 +106,15 @@ contract Strategy {
         external
         returns (uint256 amountOut)
     {
-        // Transfer the specified amount of DAI to this contract.
-        TransferHelper.safeTransferFrom(
-            address(i_weth), // token address
-            msg.sender, // spender msg.sender
-            address(this), // receiver
-            amountIn
-        );
+        // // Transfer the specified amount of DAI to this contract.
+        // TransferHelper.safeTransferFrom(
+        //     address(i_weth), // token address
+        //     msg.sender, // spender msg.sender
+        //     address(this), // receiver
+        //     amountIn
+        // );
+
+        console.log("before approve");
 
         // Approve the router to spend DAI.
         TransferHelper.safeApprove(
@@ -130,6 +122,8 @@ contract Strategy {
             address(swapRouter),
             amountIn
         );
+
+        console.log("after approve");
 
         // Naively set amountOutMinimum to 0. In production, use an oracle or other data source to choose a safer value for amountOutMinimum.
         // We also set the sqrtPriceLimitx96 to be 0 to ensure we swap our exact input amount.
@@ -145,6 +139,7 @@ contract Strategy {
                 sqrtPriceLimitX96: 0
             });
 
+        console.log("before swap");
         // The call to `exactInputSingle` executes the swap.
         amountOut = swapRouter.exactInputSingle(params);
     }

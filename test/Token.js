@@ -17,18 +17,56 @@ const UniswapV3Deployer = require('@uniswap/hardhat-v3-deploy/dist/deployer/Unis
         let weth9
         let usdcToken
 
+        const INITIAL_DEPLOYER_AMOUNT = "1000000000000000000000";
+        const POOL_PRICE = "79228162514264337593543950336"; // 79228162514264337593543950336 == 2 ^ 96 == 1 : 1 token price in fixed point Q64.96
+        const POOL_FEE = 3000;
+        const POOL_FEE_TO_SPACING = {
+            "500": 10,
+            "3000": 60,
+            "10000": 200
+        };
+        const MAXTICK = 887272;
+        const UPPERTICK = Math.floor(MAXTICK / POOL_FEE_TO_SPACING[POOL_FEE]) * POOL_FEE_TO_SPACING[POOL_FEE];
+        const LOWERTICK = -UPPERTICK;
+        const TIMESTAMP_STEP = 1000000;
+
+
         before(async () => {
             const accounts = await ethers.getSigners()
-            userAccount = accounts[0]
-            adminAccount = accounts[1]
-            deployer = (await getNamedAccounts()).deployer
-
-                ; ({ weth9, factory: uniswapFactory, router, positionManager } = await UniswapV3Deployer.deploy(adminAccount))
+            deployer = accounts[0]
+            userAccount = accounts[2]
+            adminAccount = accounts[3]
 
             let TestToken = await ethers.getContractFactory("TestToken");
             usdcToken = await TestToken.deploy(INITIAL_SUPPLY);
             await usdcToken.deployed()
+            let blockNumber = await ethers.provider.getBlockNumber();
+            let block = await ethers.provider.getBlock(blockNumber);
 
+
+            ; ({ weth9, factory: uniswapFactory, router, positionManager } = await UniswapV3Deployer.deploy(deployer))
+            console.log("------------->1 ");
+
+            await (await positionManager.createAndInitializePoolIfNecessary(weth9.address, usdcToken.address, POOL_FEE, POOL_PRICE)).wait();
+            console.log("------------->2 ");
+            await (await weth9.connect(deployer).approve(positionManager.address, INITIAL_DEPLOYER_AMOUNT)).wait();
+            console.log("------------->3 ");
+            await (await usdcToken.connect(deployer).approve(positionManager.address, INITIAL_DEPLOYER_AMOUNT)).wait();
+            console.log("------------->4 ");
+            await (await positionManager.connect(deployer).mint({
+                    /* address token0         */token0: weth9.address,
+                    /* address token1         */token1: usdcToken.address,
+                    /* uint24 fee             */fee: POOL_FEE,
+                    /* int24 tickLower        */tickLower: TickMath.MIN_TICK,
+                    /* int24 tickUpper        */tickUpper: TickMath.MAX_TICK,
+                    /* uint256 amount0Desired */amount0Desired: INITIAL_DEPLOYER_AMOUNT,
+                    /* uint256 amount1Desired */amount1Desired: INITIAL_DEPLOYER_AMOUNT,
+                    /* uint256 amount0Min     */amount0Min: "0",
+                    /* uint256 amount1Min     */amount1Min: "0",
+                    /* address recipient      */recipient: deployer.address,
+                    /* uint256 deadline       */deadline: block.timestamp + TIMESTAMP_STEP
+            })).wait();
+            console.log("------------->5 ");
         })
 
         beforeEach(async function () {
