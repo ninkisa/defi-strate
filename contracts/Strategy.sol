@@ -29,14 +29,14 @@ contract Strategy {
     ISwapRouter public immutable swapRouter;
     IWETH private immutable i_weth;
     IERC20 private immutable i_usdc;
-    // IPoolAddressesProvider private immutable i_lpAddrProvider;
+    IPoolAddressesProvider private immutable i_lpAddrProvider;
 
     // For this example, we will set the pool fee to 0.3%.
     uint24 public constant poolFee = 3000;
 
     constructor(
         address _swapRouter,
-        // address _aaveLPAddrProvider,
+        address _aaveLPAddrProvider,
         address _wethAddr,
         address _usdcAddr
     ) {
@@ -44,7 +44,7 @@ contract Strategy {
         swapRouter = ISwapRouter(_swapRouter);
         i_weth = IWETH(_wethAddr);
         i_usdc = IERC20(_usdcAddr);
-        // i_lpAddrProvider = IPoolAddressesProvider(_aaveLPAddrProvider);
+        i_lpAddrProvider = IPoolAddressesProvider(_aaveLPAddrProvider);
     }
 
     function deposit() public payable {
@@ -116,30 +116,26 @@ contract Strategy {
                 sqrtPriceLimitX96: 0
             });
 
-        console.log("swap params ...");
-        console.log("tokenIn:  %s", address(i_weth));
-        console.log("tokenOut: %s", address(i_usdc));
-        console.log("recipient: %s", address(this));
-        console.log("router: %s", address(swapRouter));
         amountOut = swapRouter.exactInputSingle(params);
-        // this.depositToAave(amountOut);
+        this.depositToAave(amountOut);
     }
 
-    // function depositToAave(uint256 amount) external {
-    //     address lendingPoolAddress = i_lpAddrProvider.getPool();
-    //     IPool lendingPoolInstance = IPool(lendingPoolAddress);
-    //     uint16 referral = 0;
+    function depositToAave(uint256 amount) external {
+        address lendingPoolAddress = i_lpAddrProvider.getPool();
+        IPool lendingPoolInstance = IPool(lendingPoolAddress);
+        uint16 referral = 0;
 
-    //     i_usdc.approve(address(lendingPoolInstance), amount);
-    //     i_usdc.approve(address(this), amount);
-    //     i_usdc.allowance(address(this), address(this));
-    //     lendingPoolInstance.supply(
-    //         address(i_usdc), // token
-    //         amount, // amount
-    //         address(this), // user
-    //         referral
-    //     );
-    // }
+        i_usdc.approve(address(lendingPoolInstance), amount);
+
+        console.log("supply usdc to lendingPool %s", lendingPoolAddress);
+
+        lendingPoolInstance.supply(
+            address(i_usdc), // token
+            amount, // amount
+            address(this), // user
+            referral
+        );
+    }
 
     function getDexAddress() public view returns (ISwapRouter) {
         return swapRouter;

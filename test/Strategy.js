@@ -1,11 +1,18 @@
 const { assert, expect } = require("chai")
-const { ethers, waffle } = require('hardhat')
+const { ethers, waffle } = require("hardhat")
+const { utils } = require("ethers")
+
 
 const { developmentChains, networkConfig } = require("../helper-hardhat-config")
 
 const UNISWAP_NFT = require("@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json");
 const UNISWAP_FACTORY = require("@uniswap/v3-core/artifacts/contracts/UniswapV3Factory.sol/UniswapV3Factory.json");
 const UNISWAP_ROUTER = require("@uniswap/v3-periphery/artifacts/contracts/SwapRouter.sol/SwapRouter.json");
+
+const AAVE_POOL_ADDR_PROVIDER = require('@aave/core-v3/artifacts/contracts/protocol/configuration/PoolAddressesProvider.sol/PoolAddressesProvider.json');
+const AAVE_POOL = require('@aave/core-v3/artifacts/contracts/mocks/helpers/MockPool.sol/MockPool.json');
+// const AAVE_POOL = require('@aave/core-v3/artifacts/contracts/mocks/helpers/MockPool.sol/MockPool.json');
+
 
 const WETH9 = require("../contracts/utils/WETH9.json");
 
@@ -15,6 +22,8 @@ const WETH9 = require("../contracts/utils/WETH9.json");
     : describe("Strategy contract", function () {
         let defiStrategy
         const sendValue = ethers.utils.parseEther("1")
+        let user
+
         let adminAccount
         let userAccount
         let deployer
@@ -40,12 +49,17 @@ const WETH9 = require("../contracts/utils/WETH9.json");
         let uniswapRouterFactory, uniswapRouterInstance;
         let uniswapNftFactory, uniswapNftInstance;
 
+        let aaveAddressProviderFactory, aaveAddressProviderInstance;
+        let aavePoolFactory, aavePoolInstance;
+
 
         before(async () => {
             const accounts = await ethers.getSigners()
             deployer = accounts[0]
             userAccount = accounts[2]
             adminAccount = accounts[3]
+
+            user = (await getNamedAccounts()).deployer
 
             testTokenFactory = await ethers.getContractFactory("TestToken");
             wethToken = await waffle.deployContract(deployer, WETH9);
@@ -60,8 +74,7 @@ const WETH9 = require("../contracts/utils/WETH9.json");
             expect(await wethToken.balanceOf(deployer.address)).to.deep.equal(INITIAL_DEPLOYER_AMOUNT);
             expect(await usdcToken.balanceOf(deployer.address)).to.deep.equal(INITIAL_DEPLOYER_AMOUNT);
 
-
-
+            // setup Uniswap V3
             uniswapFactoryFactory = new ethers.ContractFactory(UNISWAP_FACTORY.abi, UNISWAP_FACTORY.bytecode, deployer);
             uniswapFactoryInstance = await uniswapFactoryFactory.deploy();
             await uniswapFactoryInstance.deployed();
@@ -69,11 +82,6 @@ const WETH9 = require("../contracts/utils/WETH9.json");
             uniswapNftFactory = new ethers.ContractFactory(UNISWAP_NFT.abi, UNISWAP_NFT.bytecode, deployer);
             uniswapNftInstance = await uniswapNftFactory.deploy(uniswapFactoryInstance.address, wethToken.address, ZERO_ADDRESS);
             await uniswapNftInstance.deployed();
-
-
-
-            console.log("-- from test weth address %s", wethToken.address);
-            console.log("-- from test usdc address %s", usdcToken.address);
 
             uniswapRouterFactory = new ethers.ContractFactory(UNISWAP_ROUTER.abi, UNISWAP_ROUTER.bytecode, deployer);
             uniswapRouterInstance = await uniswapRouterFactory.deploy(
@@ -84,14 +92,9 @@ const WETH9 = require("../contracts/utils/WETH9.json");
             );
             await uniswapRouterInstance.deployed();
 
-
-            console.log("-- from test uniswapFactoryInstance address %s", uniswapFactoryInstance.address);
-            console.log("-- from test uniswapNftInstance address %s", uniswapNftInstance.address);
-            console.log("-- from test uniswapRouterInstance address %s", uniswapRouterInstance.address);
-
-
             let blockNumber = await ethers.provider.getBlockNumber();
             let block = await ethers.provider.getBlock(blockNumber);
+
 
             await (await uniswapNftInstance.createAndInitializePoolIfNecessary(wethToken.address, usdcToken.address, POOL_FEE, POOL_PRICE)).wait();
             await (await wethToken.connect(deployer).approve(uniswapNftInstance.address, INITIAL_DEPLOYER_AMOUNT)).wait();
@@ -111,7 +114,25 @@ const WETH9 = require("../contracts/utils/WETH9.json");
             })).wait();
             await uniswapRouterInstance.factory();
 
+            // setup Aave
+            aaveAddressProviderFactory = new ethers.ContractFactory(AAVE_POOL_ADDR_PROVIDER.abi, AAVE_POOL_ADDR_PROVIDER.bytecode, deployer);
+            aaveAddressProviderInstance = await aaveAddressProviderFactory.deploy(user);
+            await aaveAddressProviderInstance.deployed();
+            aavePoolFactory = new ethers.ContractFactory(AAVE_POOL.abi, AAVE_POOL.bytecode, deployer);
+            aavePoolInstance = await aavePoolFactory.deploy();
+            await aavePoolInstance.deployed(aaveAddressProviderInstance);
 
+            await (await aaveAddressProviderInstance.connect(deployer).setPoolImpl(aavePoolInstance.address)).wait();
+            // await (await aavePoolInstance.initialize(aaveAddressProviderInstance.address)).wait();
+            await (await aaveAddressProviderInstance.connect(deployer).setAddress(utils.keccak256(utils.toUtf8Bytes('RANDOM_ID')), aavePoolInstance.address)).wait();
+            // await (await aavePoolInstance.mintUnbacked(usdcToken.address, INITIAL_DEPLOYER_AMOUNT, deployer, 0)).wait();
+
+            console.log("aaveAddressProviderInstance === %s", aaveAddressProviderInstance.address);
+            console.log("lendingPoolAddress === %s", aavePoolInstance.address);
+            console.log("------------- Setup DONE!!!!! -------------- ");
+        })
+
+        beforeEach(async () => {
             const LibUniswap = await ethers.getContractFactory("LibUniswap");
             const uibUniswap = await LibUniswap.deploy();
             await uibUniswap.deployed();
@@ -122,9 +143,8 @@ const WETH9 = require("../contracts/utils/WETH9.json");
             //         LibUniswap: uibUniswap.address,
             //     },
             // });
-            const aaveLPAddrProviderAddress = networkConfig[network.config.chainId].aaveLPAddrProvider;
 
-            defiStrategy = await Strategy.deploy(uniswapRouterInstance.address, wethToken.address, usdcToken.address);
+            defiStrategy = await Strategy.deploy(uniswapRouterInstance.address, aaveAddressProviderInstance.address, wethToken.address, usdcToken.address);
             await defiStrategy.deployed();
 
         })
@@ -145,14 +165,12 @@ const WETH9 = require("../contracts/utils/WETH9.json");
             })
             it("Updates the amount deposited data structure", async () => {
                 await defiStrategy.deposit({ value: sendValue })
-                let user = (await getNamedAccounts()).deployer
                 const response = await defiStrategy.getAddressToAmountFunded(
                     user
                 )
                 assert.equal(response.toString(), sendValue.toString())
             })
             it("Adds funder to array of funders", async () => {
-                let user = (await getNamedAccounts()).deployer
                 await defiStrategy.deposit({ value: sendValue })
                 const response = await defiStrategy.getUser(0)
                 assert.equal(response, user)

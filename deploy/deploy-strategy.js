@@ -46,7 +46,7 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
     log("Deploying Strategy and waiting for confirmations...")
     const defiStrategy = await deploy("Strategy", {
         from: deployer,
-        args: [uniswapSwapRouterAddress, wethAddr, usdcAddr],
+        args: [uniswapSwapRouterAddress, aaveLPAddrProviderAddress, wethAddr, usdcAddr],
         log: true,
         // we need to wait if on a live network so we can verify properly
         waitConfirmations: network.config.blockConfirmations || 1,
