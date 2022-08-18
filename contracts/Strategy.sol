@@ -23,16 +23,16 @@ contract Strategy {
 
     mapping(address => uint256) private addressToAmountDeposited;
     address[] private users;
+    uint256 public minRequiredEth = 0.01 * 10**18;
 
     address private immutable i_owner;
-    uint256 public constant MINIMUM_ETH = 0.01 * 10**18;
-    ISwapRouter public immutable swapRouter;
+    ISwapRouter private immutable swapRouter;
     IWETH private immutable i_weth;
     IERC20 private immutable i_usdc;
     IPoolAddressesProvider private immutable i_lpAddrProvider;
 
     // For this example, we will set the pool fee to 0.3%.
-    uint24 public constant poolFee = 3000;
+    uint24 private poolFee = 3000;
 
     constructor(
         address _swapRouter,
@@ -52,9 +52,9 @@ contract Strategy {
             "Deposit from %s with %s ; minimum %s tokens",
             msg.sender,
             msg.value,
-            MINIMUM_ETH
+            minRequiredEth
         );
-        require(msg.value >= MINIMUM_ETH, "You need to spend more ETH!");
+        require(msg.value >= minRequiredEth, "You need to spend more ETH!");
 
         addressToAmountDeposited[msg.sender] += msg.value;
         users.push(msg.sender);
@@ -117,7 +117,7 @@ contract Strategy {
             });
 
         amountOut = swapRouter.exactInputSingle(params);
-        this.depositToAave(amountOut);
+        // this.depositToAave(amountOut);
     }
 
     function depositToAave(uint256 amount) external {
@@ -141,12 +141,35 @@ contract Strategy {
         return swapRouter;
     }
 
-    function getAddressToAmountFunded(address fundingAddress)
+    function getAddressToAmountDeposited(address fundingAddress)
         public
         view
         returns (uint256)
     {
         return addressToAmountDeposited[fundingAddress];
+    }
+
+    function getTotatDeposited() public view returns (uint256 totalAmount) {
+        for (uint256 idx = 0; idx < users.length; idx++) {
+            totalAmount = totalAmount + addressToAmountDeposited[users[idx]];
+        }
+        return totalAmount;
+    }
+
+    function getPoolFee() public view returns (uint24) {
+        return poolFee;
+    }
+
+    function setPoolFee(uint24 _poolFee) public onlyOwner {
+        poolFee = _poolFee;
+    }
+
+    function getMinRequiredEth() public view returns (uint256) {
+        return minRequiredEth;
+    }
+
+    function setMinRequiredEth(uint256 _minRequiredEth) public onlyOwner {
+        minRequiredEth = _minRequiredEth;
     }
 
     function getUser(uint256 index) public view returns (address) {
@@ -168,5 +191,13 @@ contract Strategy {
 
     receive() external payable {
         deposit();
+    }
+
+    /**
+     * @dev Throws if called by any account other than the owner.
+     */
+    modifier onlyOwner() {
+        if (msg.sender != i_owner) revert NotOwner();
+        _;
     }
 }

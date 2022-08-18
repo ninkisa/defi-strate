@@ -156,6 +156,34 @@ const WETH9 = require("../contracts/utils/WETH9.json");
             })
         })
 
+        describe("configuration", function () {
+            it("Sets the minimal required Eth correctly", async () => {
+                const oldMinEth = await defiStrategy.getMinRequiredEth()
+                assert.equal(oldMinEth.toString(), 0.01 * 10 ** 18)
+
+                await defiStrategy.setMinRequiredEth(BigInt(0.12 * 10 ** 18))
+                const newMinEth = await defiStrategy.getMinRequiredEth()
+                assert.equal(newMinEth.toString(), 0.12 * 10 ** 18)
+            })
+            it("Sets the poolFee correctly", async () => {
+                const oldPoolFee = await defiStrategy.getPoolFee()
+                assert.equal(oldPoolFee.toString(), 3000)
+
+                await defiStrategy.setPoolFee(4000)
+                const newPoolFee = await defiStrategy.getPoolFee()
+                assert.equal(newPoolFee.toString(), 4000)
+            })
+
+            it("Fails if not an owner", async () => {
+                await expect(defiStrategy.connect(userAccount).setMinRequiredEth(BigInt(0.12 * 10 ** 18))).to.be.revertedWith(
+                    "NotOwner"
+                )
+                await expect(defiStrategy.connect(userAccount).setPoolFee(4000)).to.be.revertedWith(
+                    "NotOwner"
+                )
+            })
+        })
+
 
         describe("deposit", function () {
             it("Fails if you don't send enough ETH", async () => {
@@ -165,13 +193,21 @@ const WETH9 = require("../contracts/utils/WETH9.json");
             })
             it("Updates the amount deposited data structure", async () => {
                 await defiStrategy.deposit({ value: sendValue })
-                const response = await defiStrategy.getAddressToAmountFunded(
+                const response = await defiStrategy.getAddressToAmountDeposited(
                     user
                 )
                 assert.equal(response.toString(), sendValue.toString())
             })
             it("Adds funder to array of funders", async () => {
                 await defiStrategy.deposit({ value: sendValue })
+                const response = await defiStrategy.getUser(0)
+                assert.equal(response, user)
+            })
+
+            it("Adds multiple lender", async () => {
+                await defiStrategy.deposit({ value: sendValue })
+                await defiStrategy.connect(userAccount).deposit({ value: sendValue })
+                await defiStrategy.connect(adminAccount).deposit({ value: sendValue })
                 const response = await defiStrategy.getUser(0)
                 assert.equal(response, user)
             })
