@@ -260,10 +260,15 @@ const WETH9 = require("../contracts/utils/WETH9.json");
 
         describe("withdraw", function () {
             it("Fails if user doesn't have deposit", async () => {
-                //TODO
+                await expect(defiStrategy.connect(deployer).withdraw(ethers.utils.parseEther("0.1"))).to.be.revertedWith(
+                    'Not enough ether'
+                )
             })
             it("Fails if user doesn't have enought amount", async () => {
-                //TODO
+                await defiStrategy.connect(deployer).deposit({ value: sendValue })
+                await expect(defiStrategy.connect(deployer).withdraw(ethers.utils.parseEther("3"))).to.be.revertedWith(
+                    'Not enough ether'
+                )
             })
             it("Withdraw only part of deposit", async () => {
                 //TODO
