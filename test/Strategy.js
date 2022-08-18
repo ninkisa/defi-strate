@@ -5,7 +5,7 @@ const { developmentChains, networkConfig } = require("../helper-hardhat-config")
 
 const UNISWAP_NFT = require("@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json");
 const UNISWAP_FACTORY = require("@uniswap/v3-core/artifacts/contracts/UniswapV3Factory.sol/UniswapV3Factory.json");
-const UNISWAP_ROUTER = require("@uniswap/swap-router-contracts/artifacts/contracts/SwapRouter02.sol/SwapRouter02.json");
+const UNISWAP_ROUTER = require("@uniswap/v3-periphery/artifacts/contracts/SwapRouter.sol/SwapRouter.json");
 
 const WETH9 = require("../contracts/utils/WETH9.json");
 
@@ -41,7 +41,7 @@ const WETH9 = require("../contracts/utils/WETH9.json");
         let uniswapNftFactory, uniswapNftInstance;
 
 
-        beforeEach(async () => {
+        before(async () => {
             const accounts = await ethers.getSigners()
             deployer = accounts[0]
             userAccount = accounts[2]
@@ -77,9 +77,9 @@ const WETH9 = require("../contracts/utils/WETH9.json");
 
             uniswapRouterFactory = new ethers.ContractFactory(UNISWAP_ROUTER.abi, UNISWAP_ROUTER.bytecode, deployer);
             uniswapRouterInstance = await uniswapRouterFactory.deploy(
-                /* address _factoryV2       */ZERO_ADDRESS,
+                // /* address _factoryV2       */ZERO_ADDRESS,
                 /* address factoryV3        */uniswapFactoryInstance.address,
-                /* address _positionManager */uniswapNftInstance.address,
+                // /* address _positionManager */uniswapNftInstance.address,
                 /* address _WETH9           */wethToken.address
             );
             await uniswapRouterInstance.deployed();
@@ -92,9 +92,6 @@ const WETH9 = require("../contracts/utils/WETH9.json");
 
             let blockNumber = await ethers.provider.getBlockNumber();
             let block = await ethers.provider.getBlock(blockNumber);
-
-            await uniswapRouterInstance.factory();
-
 
             await (await uniswapNftInstance.createAndInitializePoolIfNecessary(wethToken.address, usdcToken.address, POOL_FEE, POOL_PRICE)).wait();
             await (await wethToken.connect(deployer).approve(uniswapNftInstance.address, INITIAL_DEPLOYER_AMOUNT)).wait();
@@ -132,20 +129,20 @@ const WETH9 = require("../contracts/utils/WETH9.json");
 
         })
 
-        // describe("constructor", function () {
-        //     it("sets the uniswap addresses correctly", async () => {
-        //         const response = await defiStrategy.getDexAddress()
-        //         assert.equal(response, uniswapRouterInstance.address)
-        //     })
-        // })
+        describe("constructor", function () {
+            it("sets the uniswap addresses correctly", async () => {
+                const response = await defiStrategy.getDexAddress()
+                assert.equal(response, uniswapRouterInstance.address)
+            })
+        })
 
 
         describe("deposit", function () {
-            // it("Fails if you don't send enough ETH", async () => {
-            //     await expect(defiStrategy.deposit()).to.be.revertedWith(
-            //         "You need to spend more ETH!"
-            //     )
-            // })
+            it("Fails if you don't send enough ETH", async () => {
+                await expect(defiStrategy.deposit()).to.be.revertedWith(
+                    "You need to spend more ETH!"
+                )
+            })
             it("Updates the amount deposited data structure", async () => {
                 await defiStrategy.deposit({ value: sendValue })
                 let user = (await getNamedAccounts()).deployer
@@ -154,11 +151,11 @@ const WETH9 = require("../contracts/utils/WETH9.json");
                 )
                 assert.equal(response.toString(), sendValue.toString())
             })
-            // it("Adds funder to array of funders", async () => {
-            //     let user = (await getNamedAccounts()).deployer
-            //     await defiStrategy.deposit({ value: sendValue })
-            //     const response = await defiStrategy.getUser(0)
-            //     assert.equal(response, user)
-            // })
+            it("Adds funder to array of funders", async () => {
+                let user = (await getNamedAccounts()).deployer
+                await defiStrategy.deposit({ value: sendValue })
+                const response = await defiStrategy.getUser(0)
+                assert.equal(response, user)
+            })
         })
     });
