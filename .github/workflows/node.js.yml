@@ -18,6 +18,10 @@ jobs:
       matrix:
         node-version: [16.x]
         # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
+        
+    outputs:
+      session-id: ${{ steps.start-session.outputs.session-id }}
+      session-endpoint: ${{ steps.start-session.outputs.session-endpoint }}
 
     steps:
     - uses: actions/checkout@v3
@@ -29,4 +33,20 @@ jobs:
     - run: npm ci
     - run: npm run build --if-present
     - run: npm install
-    - run: npm hardhat test
+    
+    - uses: 721labs/hardhat-session-action@main
+      id: start-session
+      with:
+        cmd: "npx hardhat test"
+        # ID of session to resume; acquired through a previous output.
+        # e.g. Started in same job, previous step: `${{ steps.previously-started-session.outputs.session-id }}`
+        # e.g. Started in previous job: `${{ needs.test-action-new-session.outputs.session-id }}`
+        # Type: String
+        # Required: False
+        session-id: "${{ steps.previously-started-session.outputs.session-id }}"
+        # Directory containing your Hardhat project if it's not contained within root.
+        # Note that the action does not read job.defaults.run.working_directory.
+        # If `hardhat-directory` is set, it's unnecessary to pass `--config` within `cmd`.
+        # Type: String
+        # Required: False
+        hardhat-directory: ""
