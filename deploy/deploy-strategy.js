@@ -24,7 +24,6 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
             from: deployer,
             args: ["TestUSDC", "T1", 18],
             log: true,
-            // we need to wait if on a live network so we can verify properly
             waitConfirmations: network.config.blockConfirmations || 1,
         })
         // await (await usdc.mint(deployer.address, INITIAL_SUPPLY)).wait();

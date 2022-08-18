@@ -61,10 +61,10 @@ const WETH9 = require("../contracts/utils/WETH9.json");
 
             user = (await getNamedAccounts()).deployer
 
-            testTokenFactory = await ethers.getContractFactory("TestToken");
             wethToken = await waffle.deployContract(deployer, WETH9);
             await wethToken.deployed();
 
+            testTokenFactory = await ethers.getContractFactory("TestToken");
             usdcToken = await testTokenFactory.deploy("TestUSDC", "T1", 18);
             await usdcToken.deployed();
 
