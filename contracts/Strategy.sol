@@ -29,14 +29,14 @@ contract Strategy {
     ISwapRouter public immutable swapRouter;
     IWETH private immutable i_weth;
     IERC20 private immutable i_usdc;
-    IPoolAddressesProvider private immutable i_lpAddrProvider;
+    // IPoolAddressesProvider private immutable i_lpAddrProvider;
 
     // For this example, we will set the pool fee to 0.3%.
     uint24 public constant poolFee = 3000;
 
     constructor(
         address _swapRouter,
-        address _aaveLPAddrProvider,
+        // address _aaveLPAddrProvider,
         address _wethAddr,
         address _usdcAddr
     ) {
@@ -44,7 +44,7 @@ contract Strategy {
         swapRouter = ISwapRouter(_swapRouter);
         i_weth = IWETH(_wethAddr);
         i_usdc = IERC20(_usdcAddr);
-        i_lpAddrProvider = IPoolAddressesProvider(_aaveLPAddrProvider);
+        // i_lpAddrProvider = IPoolAddressesProvider(_aaveLPAddrProvider);
     }
 
     function deposit() public payable {
@@ -79,7 +79,10 @@ contract Strategy {
      */
     function convertInternal(uint inputAmount) internal returns (uint256) {
         // the input is ETH, should convert to WETH
+        uint256 wethBalance = address(i_weth).balance;
         i_weth.deposit{value: inputAmount}();
+        wethBalance = address(i_weth).balance;
+        console.log("Got wethBalance %s WETH", wethBalance);
 
         uint256 amountOut = this.swapExactInputSingle(inputAmount);
         return amountOut;
@@ -89,6 +92,13 @@ contract Strategy {
         external
         returns (uint256 amountOut)
     {
+        console.log(
+            "approve swap token %s, router %s, amount %s ",
+            address(i_weth),
+            address(swapRouter),
+            amountIn
+        );
+
         // Approve the router to spend DAI.
         TransferHelper.safeApprove(
             address(i_weth), // token address
@@ -96,7 +106,7 @@ contract Strategy {
             amountIn
         );
 
-        console.log("after approve");
+        console.log("swap approved ...");
 
         ISwapRouter.ExactInputSingleParams memory params = ISwapRouter
             .ExactInputSingleParams({
@@ -110,7 +120,11 @@ contract Strategy {
                 sqrtPriceLimitX96: 0
             });
 
-        console.log("before swap");
+        console.log("swap params ...");
+        console.log("tokenIn:  %s", address(i_weth));
+        console.log("tokenOut: %s", address(i_usdc));
+        console.log("recipient: %s", address(this));
+        console.log("router: %s", address(swapRouter));
         amountOut = swapRouter.exactInputSingle(params);
         // this.depositToAave(amountOut);
     }

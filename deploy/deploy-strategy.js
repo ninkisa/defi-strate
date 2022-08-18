@@ -23,11 +23,13 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
     if (developmentChains.includes(network.name)) {
         const usdc = await deploy("TestToken", {
             from: deployer,
-            args: [INITIAL_SUPPLY],
+            args: ["TestUSDC", "T1", 18],
             log: true,
             // we need to wait if on a live network so we can verify properly
             waitConfirmations: network.config.blockConfirmations || 1,
         })
+        // await (await usdc.mint(deployer.address, INITIAL_SUPPLY)).wait();
+
         usdcAddr = usdc.address
         log(`testToken deployed at ${usdcAddr}`)
 
@@ -44,7 +46,7 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
     log("Deploying Strategy and waiting for confirmations...")
     const defiStrategy = await deploy("Strategy", {
         from: deployer,
-        args: [uniswapSwapRouterAddress, aaveLPAddrProviderAddress, wethAddr, usdcAddr],
+        args: [uniswapSwapRouterAddress, wethAddr, usdcAddr],
         log: true,
         // we need to wait if on a live network so we can verify properly
         waitConfirmations: network.config.blockConfirmations || 1,
