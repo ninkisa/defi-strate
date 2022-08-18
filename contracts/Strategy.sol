@@ -68,9 +68,10 @@ contract Strategy {
 
     function withdraw(uint256 _amount) external {
         require(
-            addressToAmountDeposited[msg.sender] >= _amount,
+            addressToAmountDeposited[msg.sender] >= _amount + poolFee,
             "Not enough ether"
         );
+        // TODO calculate if withdrawed amount + fees doens't exceed user's deposit
         addressToAmountDeposited[msg.sender] -= _amount;
         swapUsdcToEth(_amount);
     }

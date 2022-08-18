@@ -282,7 +282,12 @@ const WETH9 = require("../contracts/utils/WETH9.json");
                 // assert.equal(response.toString(), newSentValue.toString())
             })
             it("Withdraw all", async () => {
-                //TODO
+                await (await defiStrategy.deposit({ value: sendValue })).wait()
+                // check if withdrawed amount + fees doens't exceed user's deposit
+                await expect(defiStrategy.connect(deployer).withdraw(ethers.utils.parseEther("1"))).to.be.revertedWith(
+                    'Not enough ether'
+                )
+
             })
             it("Withdraw when in emergency stop", async () => {
                 //TODO 
