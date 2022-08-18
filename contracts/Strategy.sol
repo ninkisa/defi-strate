@@ -96,7 +96,7 @@ contract Strategy {
             inputAmount
         );
 
-        // Approve the router to spend DAI.
+        // Approve the router to spend USDC.
         TransferHelper.safeApprove(
             address(i_usdc), // token address
             address(swapRouter),
@@ -143,7 +143,7 @@ contract Strategy {
             inputAmount
         );
 
-        // Approve the router to spend DAI.
+        // Approve the router to spend WETH.
         TransferHelper.safeApprove(
             address(i_weth), // token address
             address(swapRouter),
@@ -165,6 +165,8 @@ contract Strategy {
             });
 
         amountOut = swapRouter.exactInputSingle(params);
+
+        // FIXME
         // this.depositToAave(amountOut);
     }
 
