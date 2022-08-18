@@ -54,7 +54,6 @@ contract Strategy {
             msg.value,
             MINIMUM_ETH
         );
-        console.log(MINIMUM_ETH);
         require(msg.value >= MINIMUM_ETH, "You need to spend more ETH!");
 
         addressToAmountDeposited[msg.sender] += msg.value;

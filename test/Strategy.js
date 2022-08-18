@@ -84,6 +84,7 @@ const WETH9 = require("../contracts/utils/WETH9.json");
             );
             await uniswapRouterInstance.deployed();
 
+
             console.log("-- from test uniswapFactoryInstance address %s", uniswapFactoryInstance.address);
             console.log("-- from test uniswapNftInstance address %s", uniswapNftInstance.address);
             console.log("-- from test uniswapRouterInstance address %s", uniswapRouterInstance.address);
@@ -92,6 +93,7 @@ const WETH9 = require("../contracts/utils/WETH9.json");
             let blockNumber = await ethers.provider.getBlockNumber();
             let block = await ethers.provider.getBlock(blockNumber);
 
+            await uniswapRouterInstance.factory();
 
 
             await (await uniswapNftInstance.createAndInitializePoolIfNecessary(wethToken.address, usdcToken.address, POOL_FEE, POOL_PRICE)).wait();
@@ -110,6 +112,7 @@ const WETH9 = require("../contracts/utils/WETH9.json");
                     /* address recipient      */recipient: deployer.address,
                     /* uint256 deadline       */deadline: block.timestamp + TIMESTAMP_STEP
             })).wait();
+            await uniswapRouterInstance.factory();
 
 
             const LibUniswap = await ethers.getContractFactory("LibUniswap");
