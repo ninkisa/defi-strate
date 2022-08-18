@@ -66,16 +66,13 @@ contract Strategy {
         console.log("amountOut in usdc %s ", amountOut);
     }
 
-    function withdraw(uint256 _amount) public {
+    function withdraw(uint256 _amount) external {
         require(
             addressToAmountDeposited[msg.sender] >= _amount,
             "Not enough ether"
         );
         addressToAmountDeposited[msg.sender] -= _amount;
-        uint256 amountOut = swapUsdcToEth(_amount);
-        (bool sent, ) = msg.sender.call{value: amountOut}("Sent");
-
-        require(sent, "failed to send ETH");
+        swapUsdcToEth(_amount);
     }
 
     /**
@@ -88,9 +85,9 @@ contract Strategy {
         returns (uint256 amountOut)
     {
         // this.withdrawFromAave(amount);
-
+        console.log("------------------------------------1");
         console.log(
-            "approve swap token %s, router %s, amount %s ",
+            "approve swap usdc %s, router %s, amount %s ",
             address(i_usdc),
             address(swapRouter),
             inputAmount
@@ -119,7 +116,9 @@ contract Strategy {
 
         amountOut = swapRouter.exactInputSingle(params);
         // the input is WETH, should convert back to ETH
-        i_weth.withdraw(amountOut);
+        // i_weth.withdraw(amountOut);
+        i_weth.transfer(msg.sender, amountOut);
+
         return amountOut;
     }
 
@@ -243,13 +242,13 @@ contract Strategy {
         isStopped = false;
     }
 
-    fallback() external payable {
-        deposit();
-    }
+    // fallback() external payable {
+    //     deposit();
+    // }
 
-    receive() external payable {
-        deposit();
-    }
+    // receive() external payable {
+    //     deposit();
+    // }
 
     /**
      * @dev Throws if called by any account other than the owner.

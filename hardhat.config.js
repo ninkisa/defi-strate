@@ -1,5 +1,5 @@
 /** @type import('hardhat/config').HardhatUserConfig */
-require("@nomiclabs/hardhat-waffle")
+require("@nomicfoundation/hardhat-chai-matchers");
 require('dotenv').config();
 require("@nomiclabs/hardhat-ethers");
 require("hardhat-deploy")
@@ -31,12 +31,12 @@ module.exports = {
   defaultNetwork: "hardhat",
   networks: {
     hardhat: {
-      forking: {
-        // url: "https://eth-mainnet.g.alchemy.com/v2/Pa8FgCymR5IuyZxQTUyQUItSHA3s_YhF",
-        // blockNumber: 14390000
-        url: "https://eth-goerli.g.alchemy.com/v2/mwCSzJiWlR2gaqbRCvdOIKkcG4PcI1YG",
-        //   // blockNumber: 7413967
-      },
+      // forking: {
+      //   // url: "https://eth-mainnet.g.alchemy.com/v2/Pa8FgCymR5IuyZxQTUyQUItSHA3s_YhF",
+      //   // blockNumber: 14390000
+      //   url: "https://eth-goerli.g.alchemy.com/v2/mwCSzJiWlR2gaqbRCvdOIKkcG4PcI1YG",
+      //   //   // blockNumber: 7413967
+      // },
       // blockConfirmations: 10,
 
     },

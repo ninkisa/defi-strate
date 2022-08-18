@@ -11,7 +11,6 @@ const UNISWAP_ROUTER = require("@uniswap/v3-periphery/artifacts/contracts/SwapRo
 
 const AAVE_POOL_ADDR_PROVIDER = require('@aave/core-v3/artifacts/contracts/protocol/configuration/PoolAddressesProvider.sol/PoolAddressesProvider.json');
 const AAVE_POOL = require('@aave/core-v3/artifacts/contracts/mocks/helpers/MockPool.sol/MockPool.json');
-// const AAVE_POOL = require('@aave/core-v3/artifacts/contracts/mocks/helpers/MockPool.sol/MockPool.json');
 
 
 const WETH9 = require("../contracts/utils/WETH9.json");
@@ -61,8 +60,10 @@ const WETH9 = require("../contracts/utils/WETH9.json");
 
             user = (await getNamedAccounts()).deployer
 
-            wethToken = await waffle.deployContract(deployer, WETH9);
+            let wethTokenFactory = new ethers.ContractFactory(WETH9.abi, WETH9.bytecode, deployer);
+            wethToken = await wethTokenFactory.deploy();
             await wethToken.deployed();
+
 
             testTokenFactory = await ethers.getContractFactory("TestToken");
             usdcToken = await testTokenFactory.deploy("TestUSDC", "T1", 18);
@@ -175,10 +176,12 @@ const WETH9 = require("../contracts/utils/WETH9.json");
             })
 
             it("Fails if not an owner", async () => {
-                await expect(defiStrategy.connect(userAccount).setMinRequiredEth(BigInt(0.12 * 10 ** 18))).to.be.revertedWith(
+                await expect(defiStrategy.connect(userAccount).setMinRequiredEth(BigInt(0.12 * 10 ** 18))).to.be.revertedWithCustomError(
+                    defiStrategy,
                     "NotOwner"
                 )
-                await expect(defiStrategy.connect(userAccount).setPoolFee(4000)).to.be.revertedWith(
+                await expect(defiStrategy.connect(userAccount).setPoolFee(4000)).to.be.revertedWithCustomError(
+                    defiStrategy,
                     "NotOwner"
                 )
             })
@@ -190,13 +193,15 @@ const WETH9 = require("../contracts/utils/WETH9.json");
 
                 await defiStrategy.stopContract()
                 // Deposit should be stopped
-                await expect(defiStrategy.connect(deployer).deposit({ value: sendValue })).to.be.revertedWith(
+                await expect(defiStrategy.connect(deployer).deposit({ value: sendValue })).to.be.revertedWithCustomError(
+                    defiStrategy,
                     "StoppedInEmergency"
                 )
             })
 
             it("Fails if not an owner", async () => {
-                await expect(defiStrategy.connect(userAccount).stopContract()).to.be.revertedWith(
+                await expect(defiStrategy.connect(userAccount).stopContract()).to.be.revertedWithCustomError(
+                    defiStrategy,
                     "NotOwner"
                 )
             })
@@ -271,7 +276,10 @@ const WETH9 = require("../contracts/utils/WETH9.json");
                 )
             })
             it("Withdraw only part of deposit", async () => {
-                //TODO
+                await (await defiStrategy.deposit({ value: sendValue })).wait()
+                await defiStrategy.connect(deployer).withdraw(ethers.utils.parseEther("0.1"))
+
+                // assert.equal(response.toString(), newSentValue.toString())
             })
             it("Withdraw all", async () => {
                 //TODO
@@ -279,10 +287,9 @@ const WETH9 = require("../contracts/utils/WETH9.json");
             it("Withdraw when in emergency stop", async () => {
                 //TODO 
                 await defiStrategy.connect(deployer).deposit({ value: sendValue })
-
                 await defiStrategy.stopContract()
                 // // But withdraw should be allowed
-                // await defiStrategy.connect(deployer).withdraw(ethers.utils.parseEther("0.1"))
+                await defiStrategy.connect(deployer).withdraw(ethers.utils.parseEther("0.1"))
             })
         })
     });

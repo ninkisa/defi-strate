@@ -48,6 +48,8 @@ library LibVault {
         vs.users.push(msg.sender);
         vs.tokens.push(params_.token);
 
+        // TODO move deposit functionality here
+
         emit Deposit(msg.sender, params_.token, params_.amount);
     }
 
