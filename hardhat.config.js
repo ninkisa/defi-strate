@@ -1,5 +1,4 @@
 /** @type import('hardhat/config').HardhatUserConfig */
-require("@uniswap/hardhat-v3-deploy");
 require("@nomiclabs/hardhat-waffle")
 require('dotenv').config();
 require("@nomiclabs/hardhat-ethers");

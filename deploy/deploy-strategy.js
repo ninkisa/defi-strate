@@ -1,7 +1,6 @@
 // imports
 const { getNamedAccounts, deployments, network } = require("hardhat")
 const { networkConfig, developmentChains, INITIAL_SUPPLY } = require("../helper-hardhat-config")
-const UniswapV3Deployer = require('@uniswap/hardhat-v3-deploy/dist/deployer/UniswapV3Deployer.js').UniswapV3Deployer
 
 
 
