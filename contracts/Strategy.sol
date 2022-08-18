@@ -25,7 +25,7 @@ contract Strategy {
     address[] private users;
 
     address private immutable i_owner;
-    uint256 public constant MINIMUM_ETH = 1 * 10**18;
+    uint256 public constant MINIMUM_ETH = 0.01 * 10**18;
     ISwapRouter public immutable swapRouter;
     IWETH private immutable i_weth;
     IERC20 private immutable i_usdc;
@@ -54,6 +54,7 @@ contract Strategy {
             msg.value,
             MINIMUM_ETH
         );
+        console.log(MINIMUM_ETH);
         require(msg.value >= MINIMUM_ETH, "You need to spend more ETH!");
 
         addressToAmountDeposited[msg.sender] += msg.value;
@@ -77,33 +78,29 @@ contract Strategy {
      *
      * @param inputAmount The input amount
      */
-    function convertInternal(uint inputAmount) internal returns (uint256) {
+    function convertInternal(uint inputAmount)
+        internal
+        returns (uint256 amountOut)
+    {
         // the input is ETH, should convert to WETH
         uint256 wethBalance = address(i_weth).balance;
         i_weth.deposit{value: inputAmount}();
+
         wethBalance = address(i_weth).balance;
         console.log("Got wethBalance %s WETH", wethBalance);
 
-        uint256 amountOut = this.swapExactInputSingle(inputAmount);
-        return amountOut;
-    }
-
-    function swapExactInputSingle(uint256 amountIn)
-        external
-        returns (uint256 amountOut)
-    {
         console.log(
             "approve swap token %s, router %s, amount %s ",
             address(i_weth),
             address(swapRouter),
-            amountIn
+            inputAmount
         );
 
         // Approve the router to spend DAI.
         TransferHelper.safeApprove(
             address(i_weth), // token address
             address(swapRouter),
-            amountIn
+            inputAmount
         );
 
         console.log("swap approved ...");
@@ -115,7 +112,7 @@ contract Strategy {
                 fee: poolFee,
                 recipient: address(this),
                 deadline: block.timestamp,
-                amountIn: amountIn,
+                amountIn: inputAmount,
                 amountOutMinimum: 0,
                 sqrtPriceLimitX96: 0
             });

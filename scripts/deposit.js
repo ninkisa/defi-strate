@@ -4,15 +4,12 @@ const { ethers, getNamedAccounts, network } = require("hardhat")
 
 async function main() {
     const { deployer } = await getNamedAccounts()
-    const defiStrategy = await ethers.getContractFactory("Strategy")
-    const contract = await defiStrategy.attach(
-        "0x6A312D5fFF30Fc5f05866F399aAFD37673e41e3c" // The deployed contract address
-    );
+    const defiStrategy = await ethers.getContract("Strategy", deployer)
 
     console.log(`Got contract DeFi Strategy at ${defiStrategy.address}`)
     console.log("Deposit to contract...")
-    const transactionResponse = await contract.deposit({
-        value: ethers.utils.parseEther("0.1"),
+    const transactionResponse = await defiStrategy.deposit({
+        value: ethers.utils.parseEther("0.5"),
     })
     await transactionResponse.wait()
     console.log("Done!")
