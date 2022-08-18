@@ -5,6 +5,8 @@ pragma abicoder v2;
 
 error NotOwner();
 
+error StoppedInEmergency();
+
 import "./interfaces/IWETH.sol";
 import "./libraries/LibUniswap.sol";
 
@@ -20,6 +22,8 @@ contract Strategy {
     // The Transfer event helps off-chain applications understand
     // what happens within your contract.
     event Transfer(address indexed _from, address indexed _to, uint256 _value);
+
+    bool isStopped = false;
 
     mapping(address => uint256) private addressToAmountDeposited;
     address[] private users;
@@ -47,7 +51,7 @@ contract Strategy {
         i_lpAddrProvider = IPoolAddressesProvider(_aaveLPAddrProvider);
     }
 
-    function deposit() public payable {
+    function deposit() public payable stoppedInEmergency {
         console.log(
             "Deposit from %s with %s ; minimum %s tokens",
             msg.sender,
@@ -58,7 +62,7 @@ contract Strategy {
 
         addressToAmountDeposited[msg.sender] += msg.value;
         users.push(msg.sender);
-        uint256 amountOut = convertInternal(msg.value);
+        uint256 amountOut = swapToUsdc(msg.value);
         console.log("amountOut in usdc %s ", amountOut);
     }
 
@@ -68,7 +72,9 @@ contract Strategy {
             "Not enough ether"
         );
         addressToAmountDeposited[msg.sender] -= _amount;
-        (bool sent, ) = msg.sender.call{value: _amount}("Sent");
+        uint256 amountOut = swapUsdcToEth(_amount);
+        (bool sent, ) = msg.sender.call{value: amountOut}("Sent");
+
         require(sent, "failed to send ETH");
     }
 
@@ -77,10 +83,52 @@ contract Strategy {
      *
      * @param inputAmount The input amount
      */
-    function convertInternal(uint inputAmount)
+    function swapUsdcToEth(uint inputAmount)
         internal
         returns (uint256 amountOut)
     {
+        // this.withdrawFromAave(amount);
+
+        console.log(
+            "approve swap token %s, router %s, amount %s ",
+            address(i_usdc),
+            address(swapRouter),
+            inputAmount
+        );
+
+        // Approve the router to spend DAI.
+        TransferHelper.safeApprove(
+            address(i_usdc), // token address
+            address(swapRouter),
+            inputAmount
+        );
+
+        console.log("swap approved ...");
+
+        ISwapRouter.ExactInputSingleParams memory params = ISwapRouter
+            .ExactInputSingleParams({
+                tokenIn: address(i_usdc),
+                tokenOut: address(i_weth),
+                fee: poolFee,
+                recipient: address(this),
+                deadline: block.timestamp,
+                amountIn: inputAmount,
+                amountOutMinimum: 0,
+                sqrtPriceLimitX96: 0
+            });
+
+        amountOut = swapRouter.exactInputSingle(params);
+        // the input is WETH, should convert back to ETH
+        i_weth.withdraw(amountOut);
+        return amountOut;
+    }
+
+    /**
+     * Converts from `inputCurrency` to `usdc` using Uniswap
+     *
+     * @param inputAmount The input amount
+     */
+    function swapToUsdc(uint inputAmount) internal returns (uint256 amountOut) {
         // the input is ETH, should convert to WETH
         uint256 wethBalance = address(i_weth).balance;
         i_weth.deposit{value: inputAmount}();
@@ -185,6 +233,14 @@ contract Strategy {
         return _balance;
     }
 
+    function stopContract() public onlyOwner {
+        isStopped = true;
+    }
+
+    function resumeContract() public onlyOwner {
+        isStopped = false;
+    }
+
     fallback() external payable {
         deposit();
     }
@@ -198,6 +254,11 @@ contract Strategy {
      */
     modifier onlyOwner() {
         if (msg.sender != i_owner) revert NotOwner();
+        _;
+    }
+
+    modifier stoppedInEmergency() {
+        if (isStopped) revert StoppedInEmergency();
         _;
     }
 }

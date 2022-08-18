@@ -184,6 +184,24 @@ const WETH9 = require("../contracts/utils/WETH9.json");
             })
         })
 
+        describe("emergency stop", function () {
+            it("Stop contract", async () => {
+                await defiStrategy.connect(deployer).deposit({ value: sendValue })
+
+                await defiStrategy.stopContract()
+                // Deposit should be stopped
+                await expect(defiStrategy.connect(deployer).deposit({ value: sendValue })).to.be.revertedWith(
+                    "StoppedInEmergency"
+                )
+            })
+
+            it("Fails if not an owner", async () => {
+                await expect(defiStrategy.connect(userAccount).stopContract()).to.be.revertedWith(
+                    "NotOwner"
+                )
+            })
+        })
+
 
         describe("deposit", function () {
             it("Fails if you don't send enough ETH", async () => {
@@ -198,18 +216,68 @@ const WETH9 = require("../contracts/utils/WETH9.json");
                 )
                 assert.equal(response.toString(), sendValue.toString())
             })
-            it("Adds funder to array of funders", async () => {
+
+            it("Make deposit from same user multiple times", async () => {
+                await defiStrategy.connect(userAccount).deposit({ value: sendValue })
+                response = await defiStrategy.getAddressToAmountDeposited(
+                    userAccount.address
+                )
+                await defiStrategy.connect(userAccount).deposit({ value: sendValue })
+                response = await defiStrategy.getAddressToAmountDeposited(
+                    userAccount.address
+                )
+                assert.equal(response.toString(), sendValue.mul(2).toString())
+
+                const newSentValue = ethers.utils.parseEther("2")
+                await defiStrategy.connect(userAccount).deposit({ value: newSentValue })
+                response = await defiStrategy.getAddressToAmountDeposited(
+                    userAccount.address
+                )
+                assert.equal(response.toString(), sendValue.mul(2).add(newSentValue).toString())
+            })
+
+            it("Adds user to array of users", async () => {
                 await defiStrategy.deposit({ value: sendValue })
                 const response = await defiStrategy.getUser(0)
                 assert.equal(response, user)
             })
 
-            it("Adds multiple lender", async () => {
+            it("Adds multiple users", async () => {
                 await defiStrategy.deposit({ value: sendValue })
-                await defiStrategy.connect(userAccount).deposit({ value: sendValue })
+
                 await defiStrategy.connect(adminAccount).deposit({ value: sendValue })
-                const response = await defiStrategy.getUser(0)
+                let response = await defiStrategy.getUser(0)
                 assert.equal(response, user)
+
+                const newSentValue = ethers.utils.parseEther("2")
+                await defiStrategy.connect(userAccount).deposit({ value: newSentValue })
+                response = await defiStrategy.getAddressToAmountDeposited(
+                    userAccount.address
+                )
+                assert.equal(response.toString(), newSentValue.toString())
+            })
+        })
+
+        describe("withdraw", function () {
+            it("Fails if user doesn't have deposit", async () => {
+                //TODO
+            })
+            it("Fails if user doesn't have enought amount", async () => {
+                //TODO
+            })
+            it("Withdraw only part of deposit", async () => {
+                //TODO
+            })
+            it("Withdraw all", async () => {
+                //TODO
+            })
+            it("Withdraw when in emergency stop", async () => {
+                //TODO 
+                await defiStrategy.connect(deployer).deposit({ value: sendValue })
+
+                await defiStrategy.stopContract()
+                // // But withdraw should be allowed
+                // await defiStrategy.connect(deployer).withdraw(ethers.utils.parseEther("0.1"))
             })
         })
     });

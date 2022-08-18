@@ -2,22 +2,12 @@
 pragma solidity >=0.8.0;
 pragma abicoder v2;
 
-// import "../interfaces/ISwapRouter.sol";
-// import "./external/TransferHelper.sol";
 import "@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol";
 import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
 import "hardhat/console.sol";
 
 library LibUniswap {
-    // address public constant DAI = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
-    // address public constant WETH9 = 0xf44745f250a6733798eEd9F259542A6b57089D15; // 0xB4FBF271143F4FBf7B91A5ded31805e42b2208d6
-    // address public constant USDC = 0x5FfbaC75EFc9547FBc822166feD19B05Cd5890bb;
-
     uint24 public constant poolFee = 3000;
-
-    function print_hello() external view {
-        console.log("echoooooooooooooooooo");
-    }
 
     function swapExactInputSingle(
         ISwapRouter swapRouter,
